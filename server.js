@@ -122,6 +122,6 @@ app.get('/library/music', requireAuth, async (req, res) => {
 });
 
 // Iniciando o servidor
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Servidor EditLab Pro rodando na porta ${PORT}`);
 });
