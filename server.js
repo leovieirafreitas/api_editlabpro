@@ -24,6 +24,11 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'API EditLab Pro está rodando!' });
 });
 
+// Resposta para a raiz (evitar erro 404/502 no navegador vazio)
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'EditLab Pro API Server Ligado e Operante!' });
+});
+
 // ----------------------------------------------------------------------
 // ROTA: LOGIN
 // ----------------------------------------------------------------------
