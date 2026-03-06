@@ -93,36 +93,39 @@ function requireAuth(req, res, next) {
 }
 
 // ----------------------------------------------------------------------
-// ROTA PROTEGIDA DE EXEMPLO: Buscar Músicas (Segura)
+// ROTA PROTEGIDA DA BIBLIOTECA (Proxy Seguro para o Banco de Dados)
 // ----------------------------------------------------------------------
-app.get('/library/music', requireAuth, async (req, res) => {
-    const { limit = 50, offset = 0, q = '', category = '' } = req.query;
+const ALLOWED_TABLES = ['music_library', 'sfx_library', 'filmes_cortes', 'view_filmes_unicos'];
+
+app.get('/api/db/:table', requireAuth, async (req, res) => {
+    const table = req.params.table;
+    if (!ALLOWED_TABLES.includes(table)) {
+        return res.status(403).json({ error: 'Acesso à tabela negado.' });
+    }
 
     try {
-        let query = supabase
-            .from('music_library')
-            .select('id,titulo,artista,categorias,duracao,capa,picos,Cloud_R2_url')
-            .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+        const queryParams = new URLSearchParams(req.query).toString();
+        const targetUrl = `${SUPABASE_URL}/rest/v1/${table}?${queryParams}`;
 
-        if (q) {
-            query = query.or(`titulo.ilike.%${q}%,artista.ilike.%${q}%`);
+        const fetchRes = await fetch(targetUrl, {
+            headers: {
+                'apikey': SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                'Accept': req.headers.accept || 'application/json',
+                'Prefer': req.headers.prefer || ''
+            }
+        });
+
+        const data = await fetchRes.text();
+        const range = fetchRes.headers.get('content-range');
+        if (range) {
+            res.setHeader('Access-Control-Expose-Headers', 'Content-Range');
+            res.setHeader('Content-Range', range);
         }
-        if (category && category !== 'all') {
-            query = query.contains('categorias', [category]);
-        }
+        res.status(fetchRes.status).send(data);
 
-        const { data, error } = await query;
-        if (error) throw error;
-
-        // Se quiser ver quantas músicas tem de forma otimizada
-        const countQuery = supabase.from('music_library').select('id', { count: 'exact', head: true });
-        if (q) countQuery.or(`titulo.ilike.%${q}%,artista.ilike.%${q}%`);
-        if (category && category !== 'all') countQuery.contains('categorias', [category]);
-        const { count } = await countQuery;
-
-        res.json({ total: count, data });
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao buscar músicas.' });
+        res.status(500).json({ error: err.message });
     }
 });
 
